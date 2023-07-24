@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let full_dialog = all_transcripts.join("\n");
 
-    // Define the system prompt
+    //Define the system prompt
     println!("Starting the chat...");
     chat::start_chat(full_dialog, prompts::SYSTEM_PROMPT).await
 }
