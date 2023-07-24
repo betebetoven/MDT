@@ -12,3 +12,4 @@ openai-rust = "0.2.3"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json", "multipart"] }
 futures = "0.3"
+rocket = { version = "=0.5.0-rc.3", features = ["json"] }
