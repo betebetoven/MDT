@@ -14,6 +14,10 @@ use actix_multipart::{ Multipart };
 use futures_util::{ TryStreamExt as _ };
 use mime::{ Mime };
 use uuid::Uuid;
+mod transcription;
+mod chat;
+mod prompts;
+mod ffmpeg;
 
 
 #[actix_web::main]
@@ -87,6 +91,35 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
             while let Ok(Some(chunk)) = field.try_next().await {
                 let _ = saved_file.write_all(&chunk).await.unwrap();
             }
+            ////////COMIENZA TRANSCRIPCION
+            let file_chunks = match ffmpeg::split_audio(&destination).await {
+                Ok(chunks) => chunks,
+                Err(_) => return HttpResponse::InternalServerError().body("Failed to split audio"),
+            };
+            let mut all_transcripts = Vec::new();
+            println!("Starting the transcription process...");
+            for chunk_path in file_chunks {
+                println!("Transcribing chunk: {}", chunk_path);
+                match transcription::get_transcription(&chunk_path).await {
+                    Ok(dialog) => all_transcripts.push(dialog),
+                    Err(_) => return HttpResponse::InternalServerError().body("Failed to transcribe audio"),
+                };
+            }
+            println!("All chunks have been transcribed!");
+
+            let full_dialog = all_transcripts.join("\n");
+
+            // Define the system prompt
+            println!("Starting the chat...");
+            match chat::start_chat(full_dialog, prompts::SYSTEM_PROMPT).await {
+                Ok(_) => (),
+                Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
+            };
+
+
+
+
+
 
             current_count += 1;
         } else { break; }

@@ -47,13 +47,17 @@ pub async fn split_audio(file_path: &str) -> Result<Vec<String>, Box<dyn Error>>
 
     let mut dir = fs::read_dir("./").await?;
     while let Some(res) = dir.next_entry().await? {
-    let path = res.path();
-    if path.is_file() && path.extension() == Some(std::ffi::OsStr::new(file_extension)) {
-        if let Some(path_str) = path.to_str() {
-            output_files.push(path_str.to_string());
+        let path = res.path();
+        if path.is_file() && path.extension() == Some(std::ffi::OsStr::new(file_extension)) {
+            if let Some(stem_str) = path.file_stem().and_then(|s| s.to_str()) {
+                if stem_str.starts_with(file_stem) {
+                    if let Some(path_str) = path.to_str() {
+                        output_files.push(path_str.to_string());
+                    }
+                }
+            }
         }
     }
-}
 
 
     Ok(output_files)
