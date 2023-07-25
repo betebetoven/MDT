@@ -54,7 +54,15 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
     let max_file_size: usize = 50_000_000; // approximately 50 MB
 
     let audio_mpeg = mime::Mime::from_str("audio/mpeg").unwrap();
-    let legal_filetypes: [Mime; 4] = [IMAGE_PNG, IMAGE_JPEG, IMAGE_GIF, audio_mpeg];
+    let audio_wav = mime::Mime::from_str("audio/wav").unwrap();
+    let audio_flac = mime::Mime::from_str("audio/flac").unwrap();
+    let audio_3gpp = mime::Mime::from_str("audio/3gpp").unwrap();
+    let audio_aac = mime::Mime::from_str("audio/aac").unwrap();
+    let audio_m4a = mime::Mime::from_str("audio/x-m4a").unwrap();
+
+
+    let legal_filetypes: [Mime; 9] = [IMAGE_PNG, IMAGE_JPEG, IMAGE_GIF, audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
+
 
     let mut current_count: usize = 0;
     let dir: &str = "./upload/";
