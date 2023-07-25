@@ -12,10 +12,9 @@ use actix_web::{ HttpServer,
                  http::header::CONTENT_LENGTH };
 use actix_multipart::{ Multipart };
 use futures_util::{ TryStreamExt as _ };
-use mime::{ Mime, IMAGE_PNG, IMAGE_JPEG, IMAGE_GIF };
-use mime::MPEG;
+use mime::{ Mime };
 use uuid::Uuid;
-use image::{ DynamicImage, imageops::FilterType };
+
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -61,7 +60,7 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
     let audio_m4a = mime::Mime::from_str("audio/x-m4a").unwrap();
 
 
-    let legal_filetypes: [Mime; 9] = [IMAGE_PNG, IMAGE_JPEG, IMAGE_GIF, audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
+    let legal_filetypes: [Mime; 6] = [ audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
 
 
     let mut current_count: usize = 0;
