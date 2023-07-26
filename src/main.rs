@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
             .route("/", web::get().to(root))
             .route("/upload", web::post().to(upload))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
@@ -91,7 +91,7 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
             while let Ok(Some(chunk)) = field.try_next().await {
                 let _ = saved_file.write_all(&chunk).await.unwrap();
             }
-             ////////COMIENZA TRANSCRIPCION
+             //////COMIENZA TRANSCRIPCION
              println!("Starting the transcription process...");
 
              let mut all_transcripts = Vec::new();
@@ -106,6 +106,12 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
                      },
                      Err(_) => return HttpResponse::InternalServerError().body("Failed to transcribe audio"),
                  };
+                 let destination_clone = destination.clone();
+                    tokio::spawn(async move {
+                        if fs::remove_file(&destination_clone).await.is_ok() {
+                            println!("File {} was removed successfully", &destination_clone);
+                        }
+                    });
              } else {
                  // If file size is larger than 25MB, split and transcribe chunks.
                  let file_chunks = match ffmpeg::split_audio(&destination).await {
@@ -119,8 +125,21 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
                          Ok(dialog) => all_transcripts.push(dialog),
                          Err(_) => return HttpResponse::InternalServerError().body("Failed to transcribe audio"),
                      };
+                     let chunk_path_clone = chunk_path.clone();
+                     tokio::spawn(async move {
+                         if fs::remove_file(&chunk_path_clone).await.is_ok() {
+                             println!("File {} was removed successfully", &chunk_path_clone);
+                         }
+                     });
                  }
                  println!("All chunks have been transcribed!");
+                 let destination_clone = destination.clone();
+        tokio::spawn(async move {
+            if fs::remove_file(&destination_clone).await.is_ok() {
+                println!("File {} was removed successfully", &destination_clone);
+            }
+        });
+                 
              }
  
              let full_dialog = all_transcripts.join("\n");

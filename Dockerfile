@@ -18,6 +18,6 @@ RUN apt-get update \
 WORKDIR /app
 
 # Copy the binary from the build stage
-COPY --from=builder /app/target/release/fibonacci_project /usr/local/bin
+COPY --from=builder /app/target/release/mdt /usr/local/bin
 
 CMD ["mdt"]
