@@ -18,6 +18,10 @@ mod transcription;
 mod chat;
 mod prompts;
 mod ffmpeg;
+//////
+use openai_rust::chat::{ChatArguments, Message};
+use openai_rust::futures_util::StreamExt;  // for the `.next()` method on streams
+use std::io::{self, Write};
 
 
 #[actix_web::main]
@@ -48,6 +52,7 @@ async fn root() -> String {
 }
 
 async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
+    
     let content_length: usize = match req.headers().get(CONTENT_LENGTH) {
         Some(header_value) => header_value.to_str().unwrap_or("0").parse().unwrap(),
         None => "0".parse().unwrap(),
@@ -71,7 +76,7 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
     let dir: &str = "./upload/";
 
     if content_length > max_file_size { return HttpResponse::BadRequest().into(); }
-
+    let mut chat_output = String::new(); 
     loop {
         if current_count == max_file_count { break; }
         if let Ok(Some(mut field)) = payload.try_next().await {
@@ -146,14 +151,51 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
  
              // Define the system prompt
              println!("Starting the chat...");
-             match chat::start_chat(full_dialog, prompts::SYSTEM_PROMPT).await {
-                 Ok(_) => (),
-                 Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
-             };
+             /*match chat::start_chat(full_dialog, prompts::SYSTEM_PROMPT).await {
+                Ok(responses) => {
+                    for response in responses {
+                        println!("{}", response);
+                    }
+                    
+                },
+                Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
+            };*/
+            
+            println!("Starting the chat...");
+
+                let client = openai_rust::Client::new(&std::env::var("OPENAI_API_KEY").unwrap());
+                let prompt = format!("summarize the following dialogue:\n{}", full_dialog);
+                let args = ChatArguments::new("gpt-4", vec![
+                    Message {
+                        role: "system".to_owned(),
+                        content: prompts::SYSTEM_PROMPT.to_owned(),
+                    },
+                    Message {
+                        role: "user".to_owned(),
+                        content: prompt,
+                    },
+                ]);
+                let mut res = match client.create_chat_stream(args).await {
+                    Ok(res) => res,
+                    Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
+                };
+                
+                while let Some(events) = res.next().await {
+                    for event in match events {
+                        Ok(event) => event,
+                        Err(_) => return HttpResponse::InternalServerError().body("Failed during chat"),
+                    } {
+                        print!("{}", event);
+                        io::stdout().flush().unwrap();  // Ensure output is displayed immediately
+                        let event_str = event.to_string(); 
+                        chat_output.push_str(&event_str);
+                    }
+                }
+            
  
              current_count += 1;
          } else { break; }
      }
  
-     HttpResponse::Ok().into()
+     HttpResponse::Ok().body(chat_output) 
  }
