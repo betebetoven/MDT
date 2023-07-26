@@ -14,6 +14,8 @@ use actix_multipart::{ Multipart };
 use futures_util::{ TryStreamExt as _ };
 use mime::{ Mime };
 use uuid::Uuid;
+use async_stream::stream;
+use actix_web::web::Bytes;
 mod transcription;
 mod chat;
 mod prompts;
@@ -72,19 +74,16 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
     let legal_filetypes: [Mime; 6] = [ audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
 
 
-    let mut current_count: usize = 0;
+    
+    
     let dir: &str = "./upload/";
 
     if content_length > max_file_size { return HttpResponse::BadRequest().into(); }
     let mut chat_output = String::new(); 
-    loop {
-        if current_count == max_file_count { break; }
-        if let Ok(Some(mut field)) = payload.try_next().await {
-            let filetype: Option<&Mime> = field.content_type();
-            if filetype.is_none() { continue; }
-            if !legal_filetypes.contains(&filetype.unwrap()) { continue; }
-            if field.name() != "avatar" { continue; }
-
+    
+    if let Ok(Some(mut field)) = payload.try_next().await {
+        let filetype: Option<&Mime> = field.content_type();
+        if filetype.is_some() && legal_filetypes.contains(&filetype.unwrap()) && field.name() == "avatar" {
             let destination: String = format!(
                 "{}{}-{}",
                 dir,
@@ -193,8 +192,8 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
                 }
             
  
-             current_count += 1;
-         } else { break; }
+             
+         } 
      }
  
      HttpResponse::Ok().body(chat_output) 
