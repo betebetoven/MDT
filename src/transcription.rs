@@ -24,7 +24,7 @@ pub async fn get_transcription(file_path: &str) -> Result<String, Box<dyn std::e
     let form = Form::new()
         .text("model", "whisper-1")
         .part("file", file_part)
-        .text("initial_prompt", "A conversation between a doctor and a patient during a medical appointment");
+        .text("initial_prompt", "Una conversación entre un doctor y un paciente durante una cita médica");
 
     let res = client
         .post("https://api.openai.com/v1/audio/transcriptions")

@@ -24,12 +24,17 @@ mod ffmpeg;
 use openai_rust::chat::{ChatArguments, Message};
 use openai_rust::futures_util::StreamExt;  // for the `.next()` method on streams
 use std::io::{self, Write};
+use futures::stream::FuturesUnordered;
+use env_logger;
+
 
 
 
 
 #[actix_web::main]
 async fn main() -> Result<()> {
+    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info"); // Log only info level and above by default
+    env_logger::init();
     if !Path::new("./upload").exists() {
         fs::create_dir("./upload").await?;
     }
@@ -43,6 +48,7 @@ async fn main() -> Result<()> {
 
         App::new()
             .wrap(cors)
+            .wrap(actix_web::middleware::Logger::default())
             .route("/", web::get().to(root))
             .route("/upload", web::post().to(upload))
     })
@@ -112,35 +118,54 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
                         }
                     });
              } else {
-                 // If file size is larger than 25MB, split and transcribe chunks.
-                 let file_chunks = match ffmpeg::split_audio(&destination).await {
-                     Ok(chunks) => chunks,
-                     Err(_) => return HttpResponse::InternalServerError().body("Failed to split audio"),
-                 };
- 
-                 for chunk_path in file_chunks {
-                     println!("Transcribing chunk: {}", chunk_path);
-                     match transcription::get_transcription(&chunk_path).await {
-                         Ok(dialog) => all_transcripts.push(dialog),
-                         Err(_) => return HttpResponse::InternalServerError().body("Failed to transcribe audio"),
-                     };
-                     let chunk_path_clone = chunk_path.clone();
-                     tokio::spawn(async move {
-                         if fs::remove_file(&chunk_path_clone).await.is_ok() {
-                             println!("File {} was removed successfully", &chunk_path_clone);
-                         }
-                     });
-                 }
-                 println!("All chunks have been transcribed!");
-                 let destination_clone = destination.clone();
-        tokio::spawn(async move {
-            if fs::remove_file(&destination_clone).await.is_ok() {
-                println!("File {} was removed successfully", &destination_clone);
+                // If file size is larger than 25MB, split and transcribe chunks.
+                let file_chunks = match ffmpeg::split_audio(&destination).await {
+                    Ok(chunks) => chunks,
+                    Err(_) => return HttpResponse::InternalServerError().body("Failed to split audio"),
+                };
+                
+                let file_chunks_length = file_chunks.len();
+                let mut transcription_tasks = FuturesUnordered::new();
+            
+                for (i, chunk_path) in file_chunks.into_iter().enumerate() {
+                    println!("Adding chunk {} to transcription tasks: {}", i, chunk_path);
+            
+                    // Keep a copy of chunk_path for deletion
+                    let chunk_path_clone = chunk_path.clone();
+            
+                    // Spawn task to transcribe chunk and add to FuturesUnordered
+                    transcription_tasks.push(async move {
+                        let transcript = transcription::get_transcription(&chunk_path).await?;
+                        if fs::remove_file(&chunk_path_clone).await.is_ok() {
+                            println!("File {} was removed successfully", &chunk_path_clone);
+                        }
+                        Ok::<_, Box<dyn std::error::Error>>((i, transcript))
+                    });
+                }
+                all_transcripts = vec![String::new(); file_chunks_length];
+                while let Some(result) = transcription_tasks.next().await {
+                    match result {
+                        Ok((i, dialog)) => {
+                            all_transcripts[i] = dialog;
+                            println!("----------------------Received transcript for chunk {}: {}", i, all_transcripts[i]); // Print the received transcript for each chunk
+                        }
+                        Err(_) => return HttpResponse::InternalServerError().body("Failed to transcribe audio"),
+                    };
+                }
+                println!("All chunks have been transcribed!");
+            
+                let destination_clone = destination.clone();
+                tokio::spawn(async move {
+                    if fs::remove_file(&destination_clone).await.is_ok() {
+                        println!("File {} was removed successfully", &destination_clone);
+                    }
+                });
             }
-        });     
-    }
+            
+            
  
             let full_dialog = all_transcripts.join("\n");
+            println!("Full dialog: {}", full_dialog); 
             println!("Starting the chat...");
                 let client = openai_rust::Client::new(&std::env::var("OPENAI_API_KEY").unwrap());
                 let prompt = format!("summarize the following dialogue:\n{}", full_dialog);
