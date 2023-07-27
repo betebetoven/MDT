@@ -1,4 +1,4 @@
-use std::process::Command;
+use tokio::process::Command;
 use std::error::Error;
 use tokio::fs;
 
@@ -23,16 +23,18 @@ pub async fn split_audio(file_path: &str) -> Result<Vec<String>, Box<dyn Error>>
     );*/
 
     let output = Command::new("ffmpeg")
-    .arg("-i")
-    .arg(file_path)
-    .arg("-f")
-    .arg("segment")
-    .arg("-segment_time")
-    .arg("600")
-    .arg("-c")
-    .arg("copy")
-    .arg(format!("{}_%03d.{}", file_stem, file_extension))
-    .output()?;
+        .arg("-i")
+        .arg(file_path)
+        .arg("-f")
+        .arg("segment")
+        .arg("-segment_time")
+        .arg("600")
+        .arg("-c")
+        .arg("copy")
+        .arg(format!("{}_%03d.{}", file_stem, file_extension))
+        .output()
+        .await?;  // Await here!
+
 
 
     if !output.status.success() {
