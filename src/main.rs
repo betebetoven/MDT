@@ -17,13 +17,15 @@ use uuid::Uuid;
 use async_stream::stream;
 use actix_web::web::Bytes;
 mod transcription;
-mod chat;
+//mod chat;
 mod prompts;
 mod ffmpeg;
 //////
 use openai_rust::chat::{ChatArguments, Message};
 use openai_rust::futures_util::StreamExt;  // for the `.next()` method on streams
 use std::io::{self, Write};
+
+
 
 
 #[actix_web::main]
@@ -60,26 +62,19 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
         None => "0".parse().unwrap(),
     };
 
-    let max_file_count: usize = 3;
+    //let max_file_count: usize = 3;
     let max_file_size: usize = 50_000_000; // approximately 50 MB
-
     let audio_mpeg = mime::Mime::from_str("audio/mpeg").unwrap();
     let audio_wav = mime::Mime::from_str("audio/wav").unwrap();
     let audio_flac = mime::Mime::from_str("audio/flac").unwrap();
     let audio_3gpp = mime::Mime::from_str("audio/3gpp").unwrap();
     let audio_aac = mime::Mime::from_str("audio/aac").unwrap();
     let audio_m4a = mime::Mime::from_str("audio/x-m4a").unwrap();
-
-
     let legal_filetypes: [Mime; 6] = [ audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
-
-
-    
-    
     let dir: &str = "./upload/";
 
     if content_length > max_file_size { return HttpResponse::BadRequest().into(); }
-    let mut chat_output = String::new(); 
+    //let mut chat_output = String::new(); 
     
     if let Ok(Some(mut field)) = payload.try_next().await {
         let filetype: Option<&Mime> = field.content_type();
@@ -142,26 +137,11 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
             if fs::remove_file(&destination_clone).await.is_ok() {
                 println!("File {} was removed successfully", &destination_clone);
             }
-        });
-                 
-             }
+        });     
+    }
  
-             let full_dialog = all_transcripts.join("\n");
- 
-             // Define the system prompt
-             println!("Starting the chat...");
-             /*match chat::start_chat(full_dialog, prompts::SYSTEM_PROMPT).await {
-                Ok(responses) => {
-                    for response in responses {
-                        println!("{}", response);
-                    }
-                    
-                },
-                Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
-            };*/
-            
+            let full_dialog = all_transcripts.join("\n");
             println!("Starting the chat...");
-
                 let client = openai_rust::Client::new(&std::env::var("OPENAI_API_KEY").unwrap());
                 let prompt = format!("summarize the following dialogue:\n{}", full_dialog);
                 let args = ChatArguments::new("gpt-4", vec![
@@ -179,22 +159,28 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
                     Err(_) => return HttpResponse::InternalServerError().body("Failed to start chat"),
                 };
                 
-                while let Some(events) = res.next().await {
-                    for event in match events {
-                        Ok(event) => event,
-                        Err(_) => return HttpResponse::InternalServerError().body("Failed during chat"),
-                    } {
-                        print!("{}", event);
-                        io::stdout().flush().unwrap();  // Ensure output is displayed immediately
-                        let event_str = event.to_string(); 
-                        chat_output.push_str(&event_str);
+                let chat_output_stream = stream! {
+                    while let Some(events) = res.next().await {
+                        for event in match events {
+                            Ok(event) => event,
+                            Err(_) => {
+                                yield Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed during chat"));
+                                return;
+                            },
+                        } {
+                            print!("{}", event);
+                            io::stdout().flush().unwrap();  // Ensure output is displayed immediately
+                            yield Ok(Bytes::from(event.to_string()));
+                        }
                     }
-                }
+                };
+                
+                return HttpResponse::Ok().streaming(chat_output_stream);
             
  
              
          } 
      }
  
-     HttpResponse::Ok().body(chat_output) 
+     HttpResponse::BadRequest().into()
  }
