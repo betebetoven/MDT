@@ -76,7 +76,9 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
     let audio_3gpp = mime::Mime::from_str("audio/3gpp").unwrap();
     let audio_aac = mime::Mime::from_str("audio/aac").unwrap();
     let audio_m4a = mime::Mime::from_str("audio/x-m4a").unwrap();
-    let legal_filetypes: [Mime; 6] = [ audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a];
+    let audio_webm = mime::Mime::from_str("audio/webm").unwrap();
+
+    let legal_filetypes: [Mime; 7] = [ audio_mpeg,audio_wav, audio_flac, audio_3gpp, audio_aac, audio_m4a, audio_webm];
     let dir: &str = "./upload/";
 
     if content_length > max_file_size { return HttpResponse::BadRequest().into(); }
