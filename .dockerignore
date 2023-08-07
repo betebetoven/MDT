@@ -1,0 +1,7 @@
+# flyctl launch added from .gitignore
+target
+**\ImperialMarch60_chunk_0.wav
+**\*.mp3
+**\*.wav
+**\*.m4a
+fly.toml
