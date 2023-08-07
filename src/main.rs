@@ -16,7 +16,7 @@ mod prompts;
 mod ffmpeg;
 use openai_rust::chat::{ChatArguments, Message};
 use openai_rust::futures_util::StreamExt;  // for the `.next()` method on streams
-use std::io::{self, Write};
+
 use futures::stream::FuturesUnordered;
 use env_logger;
 use serde::Deserialize;
@@ -73,6 +73,7 @@ async fn main() -> std::io::Result<()> {
 
 async fn root() -> String {
     "Server is up and running.".to_string()
+    print!("que peo")
 }
 
 async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
@@ -353,7 +354,7 @@ async fn upload(mut payload: Multipart, req: HttpRequest) -> HttpResponse {
 
  async fn print_text(req: HttpRequest, info: web::Json<Info>) -> HttpResponse {
     // Extract the Authorization header
-    if let Some(auth_header) = req.headers().get("Authorization") {
+    if let Some(_auth_header) = req.headers().get("Authorization") {
         // Validate the token if necessary...
         //println!("Authorization: {:?}", auth_header);
         println!("Received text");
